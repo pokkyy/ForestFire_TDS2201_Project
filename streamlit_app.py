@@ -19,6 +19,37 @@ from sklearn.metrics import mean_squared_error
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error
+import altair as alt
+
+def userWeather():
+    temp_input = st.number_input("Temperature", value=0.0)
+    RH_input = st.number_input("Relative humidity", value=0.0)
+    wind_input = st.number_input("Wind speed", value=0.0)
+    rain_input = st.number_input("Rain", value=0.0)
+    
+    user_inputs = pd.DataFrame({
+        'temp': [temp_input],
+        'RH': [RH_input],
+        'wind' :[wind_input],
+        'rain': [rain_input]
+    })
+        
+    return user_inputs
+
+def userFWI():
+    FFMC_input = st.number_input("FFMC", value=0.0)
+    DMC_input = st.number_input("DMC", value=0.0)
+    DC_input = st.number_input("DC", value=0.0)
+    ISI_input = st.number_input("ISI", value=0.0)
+            
+    user_inputs = pd.DataFrame({
+        'FFMC': [FFMC_input],
+        'DMC': [DMC_input],
+        'DC' :[DC_input],
+        'ISI': [ISI_input]
+    })
+    
+    return user_inputs
 
 st.sidebar.write('**The Intensity of Forest Fires Throughout the Year**')
 st.sidebar.write('TDS2101 Data Science Fundamentals Project')
@@ -41,11 +72,11 @@ with st.expander("**Expected Output:**"):
     "- Show prediction on weather conditions that would result in a high FWI","\n",
     "- Provide information on the amount of forest that is burned due to the intensity of the fire.")
 
-tab1, tab2, tab3 = st.tabs(["Database", "Exploratory Data Analysis", "Data Modelling"])
+tab1, tab2, tab3, tab4= st.tabs(["Database", "Exploratory Data Analysis", "Data Modelling", "Make Predictions"])
 
 with tab1:
     # Intro -------------------------------------------------------------------------
-    st.title("Forest Fires Database")
+    st.title("🌳 Forest Fires Database")
     
     st.header('Original Database')
     df_original = pd.read_csv('forestfires.csv')
@@ -65,7 +96,7 @@ with tab1:
 
 with tab2:
     # EDA ---------------------------------------------------------------------------
-    st.header('Exploratory Data Analysis')
+    st.header('🔎 Exploratory Data Analysis')
 
     st.subheader('Brief description of data')
     st.table(df.describe())
@@ -77,102 +108,91 @@ with tab2:
         sns.set_palette("viridis")
         sns.set_style('darkgrid')
         colours_list = ["viridis", "rocket", 'mako']
+        alt.themes.enable('dark')
 
         st.header('Area burned per month')
-        # fires per month
-        fires_per_month = df[df['area'] > 0]['month'].value_counts()
-        fig, ax = plt.subplots(figsize=(15, 5))
-        ax.barh(fires_per_month.index, fires_per_month.values)
-        ax.set_xlabel('Number of fires')
-        ax.set_ylabel('Month')
-        ax.set_title('Number of fires per month')
-        st.pyplot(fig)
-        plt.close(fig)
+        # fires per month -----------------------------------------------------------------
+        fires_per_month = df[df['area'] > 0]['month'].value_counts().reset_index()
+        fires_per_month.columns = ['Month', 'Number of Fires']
+        chart = alt.Chart(fires_per_month).mark_bar().encode(
+            x=alt.X('Number of Fires:Q'),
+            y=alt.Y('Month:N', sort=None),
+            tooltip=['Month', 'Number of Fires'])
+        st.altair_chart(chart, use_container_width=True)
         
-        st.write('Exact count of fires per month')
-        fireMonthsCount = {'Month': ['August', 'September', 'July', 'March', 'February', 'Dec', 'June', 'October', 'April', 'May'],
-        'Number of Fires': [99, 97, 18, 18, 10, 9, 8, 5, 4, 1]}
-        fireMonthsCount_df = pd.DataFrame(fireMonthsCount)
-        st.table(fireMonthsCount_df)
+        # tooltip makes this redundant
+        # st.write('Exact count of fires per month')
+        # fireMonthsCount = {'Month': ['August', 'September', 'July', 'March', 'February', 'Dec', 'June', 'October', 'April', 'May'],
+        # 'Number of Fires': [99, 97, 18, 18, 10, 9, 8, 5, 4, 1]}
+        # fireMonthsCount_df = pd.DataFrame(fireMonthsCount)
+        # st.table(fireMonthsCount_df)
 
         # log area burned
         st.subheader('Log area burned')
         area_burnt = df[df['area'] != 0].copy()
-        fig, ax = plt.subplots(figsize=(8, 5))
-        sns.histplot(area_burnt['area'], log_scale=True, kde=True, ax=ax)
-        ax.set_xlabel('Log area')
-        ax.set_title('Log area burned')
-        st.pyplot(fig)
-        plt.close(fig)
+        chart = alt.Chart(df_log).mark_bar().encode(
+            x=alt.X('logarea:Q', bin=alt.Bin(maxbins=30), title='Logarea'),
+            y=alt.Y('count()', stack=None),
+            tooltip='count()')
+        st.altair_chart(chart, use_container_width=True)
+        
         with st.expander("Why log area?"):
             st.write("In the original dataset, the output \'area\' had undergone a ln(x+1) transformation function. For the purpose of this project, the exact transformation was applied.")
             st.write("By creating a histogram of log (area), we can see that the data is normally distributed.")
 
         # area burned months
         st.subheader("Area burned throughout the year")
-        fig, ax = plt.subplots(figsize=(8, 15))
-        sns.boxplot(data=area_burnt, x='month', y='area', ax=ax)
-        ax.set_xlabel('Month')
-        ax.set_ylabel('Area burned')
-        ax.set_title('Area burned throughout the year')
-        st.pyplot(fig)
-        plt.close(fig)
+        # Create an Altair chart
+        chart = alt.Chart(area_burnt).mark_boxplot().encode(
+            x=alt.X('month:N', title='Month'),
+            y=alt.Y('area:Q', title='Area burned'),
+            tooltip=['month', 'area']
+        ).properties(
+            height=900,
+            title='Area burned throughout the year'
+        )
+        st.altair_chart(chart, use_container_width=True)
         
         # weather and fwi ----------------------------------------------------------------
         st.header("FWI indices and weather conditions for each month")
         # fwi ----------------------------------------------------------------------------
-        fig, ax = plt.subplots(1, 4, figsize=(20, 8))
-        fig.suptitle('FWI: Forest Fire Weather Index statistics')
-        
-        sns.barplot(x='month', y='FFMC', data=df, ax=ax[0])
-        sns.barplot(x='month', y='DMC', data=df, ax=ax[1])
-        sns.barplot(x='month', y='DC', data=df, ax=ax[2])
-        sns.barplot(x='month', y='ISI', data=df, ax=ax[3])
+        # FWI indices plot
+        fwi_indices = ['FFMC', 'DMC', 'DC', 'ISI']
+        fwi_charts = []
 
-        ax[0].set_xlabel("Month")
-        ax[0].set_ylabel("Index")
-        ax[0].set_title("FFMC Index")
+        for index in fwi_indices:
+            chart = alt.Chart(df).mark_bar().encode(
+                x='month',
+                y=alt.Y(index, title='Index'),
+                tooltip=index
+            ).properties(
+                width=200,
+                title=f'{index} Index'
+            )
+            fwi_charts.append(chart)
 
-        ax[1].set_xlabel("Month")
-        ax[1].set_ylabel("DMC Index")
-        ax[1].set_title("DMC Index")
+        # Environmental conditions plot
+        conditions = ['temp', 'RH', 'wind', 'rain']
+        condition_charts = []
 
-        ax[2].set_xlabel("Month")
-        ax[2].set_ylabel("Index")
-        ax[2].set_title("DC Index")
+        for condition in conditions:
+            chart = alt.Chart(df).mark_boxplot().encode(
+                x='month',
+                y=alt.Y(condition, title=condition),
+                tooltip=[condition]
+            ).properties(
+                width=200,
+                title=condition.capitalize()
+            )
+            condition_charts.append(chart)
 
-        ax[3].set_xlabel("Month")
-        ax[3].set_ylabel("Index")
-        ax[3].set_title("ISI Index")
-        st.pyplot(fig)
-        plt.close(fig)
+        fwi_combined_chart = alt.concat(*fwi_charts, columns=2)
+        condition_combined_chart = alt.concat(*condition_charts, columns=2)
 
-        # weather ------------------------------------------
-        fig, ax = plt.subplots(1,4, figsize=(20,8))
-        fig.suptitle('Enviromental conditions throughout the year')
-
-        sns.boxplot(x='month', y='temp', data=df, ax=ax[0])
-        sns.boxplot(x='month', y='RH', data=df, ax=ax[1])
-        sns.boxplot(x='month', y='wind', data=df, ax=ax[2])
-        sns.boxplot(x='month', y='rain', data=df, ax=ax[3])
-
-        ax[0].set_xlabel("Month")
-        ax[0].set_ylabel("degree Celcius")
-        ax[0].set_title("Temperature in Celcius degrees")
-
-        ax[1].set_xlabel("Month")
-        ax[1].set_ylabel("RH")
-        ax[1].set_title("Relative humidity")
-
-        ax[2].set_xlabel("Month")
-        ax[2].set_ylabel("Speed")
-        ax[2].set_title("Wiind speed in km/h")
-
-        ax[3].set_xlabel("Month")
-        ax[3].set_ylabel("mm/m2")
-        ax[3].set_title("Outside rain")
-        st.pyplot(fig)
-        plt.close(fig)
+        st.subheader('FWI: Forest Fire Weather Index statistics')
+        st.altair_chart(fwi_combined_chart, use_container_width=True)
+        st.subheader('Environmental conditions throughout the year')
+        st.altair_chart(condition_combined_chart, use_container_width=True)
         
         st.write('It is worth noting that seasonal changes affect the environmental conditions and the FWI indices, potentially leading to more outbreaks of forest fires.')
 
@@ -186,20 +206,31 @@ with tab2:
 
         with EDA1:
             st.header('Analysing the relationship between the FWI, environmental factors, and the area burned')
+
             st.subheader('Correlation analysis')
             variables = ['FFMC', 'DMC', 'DC', 'ISI', 'temp', 'RH', 'wind', 'rain', 'area', 'logarea']
+            df_corr = df_log[['FFMC', 'DMC', 'DC', 'ISI', 'temp', 'RH', 'wind', 'rain', 'area', 'logarea']].dropna().corr()
+            
             pairplot = sns.pairplot(df_log, vars=variables, hue='month')
             st.pyplot(pairplot.fig)
             plt.close(pairplot.fig)  # closing the pairplot to avoid duplicate display
             
-            df_corr = df_log[['FFMC', 'DMC', 'DC', 'ISI', 'temp', 'RH', 'wind', 'rain', 'area', 'logarea']].dropna().corr()
-            st.write('Correlation summary')
-            st.table(df_corr)
-            
-            st.write('Heatmap of correlation')
-            heatmap = sns.heatmap(df_corr, annot=True)
-            st.pyplot(heatmap.figure)
-            plt.close(heatmap.figure)            
+            # Correlation Summary
+            st.subheader('Correlation summary')
+            st.dataframe(df_corr)
+
+            # Heatmap of Correlation
+            heatmap = alt.Chart(df_corr.reset_index().melt('index')).mark_rect().encode(
+                x='index:O',
+                y='variable:O',
+                color='value:Q'
+            ).properties(
+                width=500,
+                height=400,
+                title='Heatmap of Correlation'
+            )
+            st.altair_chart(heatmap, use_container_width=True)
+                    
         
         with EDA2:
             st.header('Observing the relationship between forest fire counts within a month and the enviromental conditions and FWI index')
@@ -212,35 +243,23 @@ with tab2:
             monthly_avg['month'] = pd.Categorical(monthly_avg['month'], categories=month_order, ordered=True)
             monthly_avg = monthly_avg.sort_values('month')
 
-            ax1.plot(month_order, monthly_avg.groupby('month')['area'].mean(), marker='o', label='Burned Area')
-            ax1.plot(month_order, monthly_avg.groupby('month')['temp'].mean(), marker='o', label='Temperature')
-            ax1.plot(month_order, monthly_avg.groupby('month')['RH'].mean(), marker='o', label='Relative Humidity')
-            ax1.plot(month_order, monthly_avg.groupby('month')['wind'].mean(), marker='o', label='Wind')
-            ax1.plot(month_order, monthly_avg.groupby('month')['rain'].mean(), marker='o', label='Rain')
+            # Melt the dataframe to long format
+            melted_df = monthly_avg.melt('month', var_name='Variable', value_name='Mean Value')
 
-            ax1.set_xlabel('Month')
-            ax1.set_ylabel('Average Value')
-            ax1.set_title('Average Burned Area and Environmental Conditions by Month')
-            ax1.legend()
-            ax1.set_xticklabels(month_order, rotation=45)
+            # Line chart for Average values by Month
+            line_chart = alt.Chart(melted_df).mark_line(point=True).encode(
+                x=alt.X('month:N', title='Month'),
+                y=alt.Y('mean(Mean Value):Q', title='Mean Value'),
+                color=alt.Color('Variable:N', title='Variable'),
+                tooltip=['month:N', 'Variable:N', alt.Tooltip('mean(Mean Value):Q')]
+            ).properties(
+                height=600,
+                title='Average Values by Month'
+            )
 
-            ax2.plot(month_order, monthly_avg.groupby('month')['area'].mean(), marker='o', label='Burned Area')
-            ax2.plot(month_order, monthly_avg.groupby('month')['FFMC'].mean(), marker='o', label='FFMC')
-            ax2.plot(month_order, monthly_avg.groupby('month')['DMC'].mean(), marker='o', label='DMC')
-            ax2.plot(month_order, monthly_avg.groupby('month')['DC'].mean(), marker='o', label='DC')
-            ax2.plot(month_order, monthly_avg.groupby('month')['ISI'].mean(), marker='o', label='ISI')
-
-            ax2.set_xlabel('Month')
-            ax2.set_ylabel('Average Value')
-            ax2.set_title('Average Burned Area and FWI Metrics by Month')
-            ax2.legend()
-            ax2.set_xticklabels(month_order, rotation=45)
-
-            fig.tight_layout()
-            st.pyplot(fig)
-            plt.close(fig)
-            st.write('We can conclude that enviromental conditions and FWI metrics play a role in the occurrence and severity of forest fires, with specific months showing distinct patterns in relation to burned areas.')
-            
+            st.altair_chart(line_chart, use_container_width=True)
+            st.write('We can conclude that enviromental conditions and FWI metrics play a role in the occurrence and severity of forest fires, ',
+                     'with specific months showing distinct patterns in relation to burned areas.')
         
         with EDA3:
             # FWI intensity ranking ---------------------------------------------------------------
@@ -250,15 +269,16 @@ with tab2:
             fwi['FWI_score'] = fwi['FFMC'] + fwi['DMC'] + fwi['DC'] + fwi['ISI']
             fwi['FWI_rank'] = fwi.groupby('FWI_score')['area'].rank()
 
-            fig, ax = plt.subplots(figsize=(8, 8))
-            scatterplot = sns.scatterplot(x='FWI_score', y='logarea', hue='FWI_rank', data=fwi, ax=ax)
+            scatterplot = alt.Chart(fwi).mark_circle().encode(
+                x='FWI_score',
+                y='logarea',
+                color='FWI_rank:N'
+            ).properties(
+                width=600,
+                height=800
+            ).interactive()
 
-            scatterplot.set_xlabel('FWI score')
-            scatterplot.set_ylabel('Area burned')
-            scatterplot.set_title('Fire Intensity vs. Log Area Burned')
-
-            st.pyplot(fig)
-            plt.close(fig)
+            st.altair_chart(scatterplot, use_container_width=True)
 
             st.write("Analysis of fire intensity, their FWI scoring, and the area burned")
             fwi_stats = fwi.groupby('FWI_rank').agg({'FWI_score': ['min', 'max', 'mean'], 'area': ['min', 'max', 'mean', 'count']})
@@ -290,8 +310,8 @@ with tab2:
 
 
 with tab3:
-    st.title('Data Modelling')
-    DM1, DM2, DM3, DM4 = st.tabs(["Fire prediction based on weather", "Fire prediction based on FWI", "Area burned prediction based on FWI", "Prediction of forest fires in a month"])
+    st.title('🧪 Data Modelling')
+    DM1, DM2, DM3, DM4 = st.tabs(["Fire prediction based on weather", "Fire prediction based on FWI", "Weather and FWI score", "Prediction of forest fires in a month"])
     
     # data prep
     features = ['month', 'FFMC', 'DMC', 'DC', 'ISI', 'FWI_score', 'FWI_rank', 'temp', 'RH', 'wind', 'rain', 'area', 'logarea']
@@ -304,33 +324,37 @@ with tab3:
     scaled = scaler.fit_transform(fires)
     
     with DM1:
-        st.header('Finding relation between environmental factors and the area burned, and predicting if a fire will start based on environmental factors')
+        st.header('Predicting if a fire will start based on environmental factors')
         env_factors = ['temp', 'RH', 'wind', 'rain']
         X = fires[env_factors]
         y = fires['area']
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=1)
-        reg = LinearRegression().fit(X_train, y_train)
-        y_pred = reg.predict(X_test)
+        DM1reg = LinearRegression().fit(X_train, y_train)
+        y_pred = DM1reg.predict(X_test)
 
         st.write('A linear regression model with 70% training and 30% testing was used. ',
                  'The X variables in this model were temperature, RH, wind, and rain. While our target Y variable is area.')
         with st.expander('Model results:'):
             st.write('Mean absolute error:', mean_absolute_error(y_test, y_pred))
-            st.write('Coefficients (temperature, RH (relative humidity), wind, rain):', reg.coef_)
-            st.write('Intercept:', reg.intercept_)
-            st.write('Determination coefficient: ', reg.score(X_test, y_test))
+            st.write('Coefficients (temperature, RH (reslative humidity), wind, rain):', DM1reg.coef_)
+            st.write('Intercept:', DM1reg.intercept_)
+            st.write('Determination coefficient: ', DM1reg.score(X_test, y_test))
         
         y_test_log = np.log(y_test)
         y_pred_log = np.log(y_pred)
 
         st.subheader('Model predictions vs actual results')
-        fig = plt.figure()
-        plt.scatter(y_test_log, y_pred_log)
-        plt.xlabel('LogArea')
-        plt.ylabel('Predicted LogArea')
-        plt.title('Actual vs Predicted Burned LogArea by weather')
-        st.pyplot(fig)
-        plt.close(fig)
+        
+        scatter_data = pd.DataFrame({'y_test_log': y_test_log, 'y_pred_log': y_pred_log})
+        scatterplot = alt.Chart(scatter_data).mark_circle().encode(
+            x='y_test_log',
+            y='y_pred_log'
+        ).properties(
+            width=600,
+            height=600,
+            title='Actual vs Predicted Burned LogArea by weather'
+        ).interactive()
+        st.altair_chart(scatterplot, use_container_width=True)
         st.write('Weather may not hold much of an influence on forest fires')
         
         st.header('Using K-Means')
@@ -352,38 +376,54 @@ with tab3:
             distortions.append(km.inertia_)
 
         # plot
-        fig = plt.figure()
-        plt.plot(range(2, 15), distortions, marker='o')
-        plt.xlabel('Number of clusters')
-        plt.ylabel('Distortion')
-        plt.title('Cluster count based off distortions')
-        st.pyplot(fig)
-        plt.close(fig)
+        line_data = pd.DataFrame({'Number of clusters': range(2, 15), 'Distortion': distortions})
+        lineplot = alt.Chart(line_data).mark_line().encode(
+            x='Number of clusters',
+            y='Distortion'
+        ).properties(
+            width=600,
+            height=400,
+            title='Cluster count based off distortions'
+        )
+        # Add markers to the line plot
+        markerplot = alt.Chart(line_data).mark_point().encode(
+            x='Number of clusters',
+            y='Distortion'
+        )
+        combined_plot = lineplot + markerplot
+        st.altair_chart(combined_plot, use_container_width=True)
         st.write('Here, we will use K=5.')
         
         k5 = KMeans(n_clusters = 5, random_state=1).fit(KMEnvScaled)
         KMEnv['K5'] = k5.labels_
         
         st.subheader('Cluster distribution analsysi')
-        fig, ax = plt.subplots(1,2, figsize=(15,8))
-        fig.suptitle('Analysis of cluster distribution')
-        plt.figure(figsize=(8,8))
-        sns.scatterplot(x=fwi['FWI_score'], y=fwi['logarea'], hue=KMEnv['K5'], ax=ax[0])
-        sns.histplot(KMEnv['K5'], bins=5, ax=ax[1])
+        scatter_data = pd.DataFrame({'FWI_score': fwi['FWI_score'], 'logarea': fwi['logarea'], 'K5': KMEnv['K5']})
 
-        ax[0].set_xlabel('FWI score')
-        ax[0].set_ylabel('logarea')
-        ax[0].set_title('KMeans of Weather conditions with FWI scores and LogArea burned')
-        ax[0].legend()
+        # Scatter plot
+        scatterplot = alt.Chart(scatter_data).mark_circle(size=50).encode(
+            x='FWI_score',
+            y='logarea',
+            color='K5:N',
+            tooltip=['FWI_score', 'logarea', 'K5']
+        ).properties(
+            width=500,
+            height=400,
+            title='KMeans of Weather conditions with FWI scores and LogArea burned'
+        ).interactive()
 
-        ax[1].set_xlabel('Cluster')
-        ax[1].set_ylabel('Count')
-        ax[1].set_title('Histogram of cluster counts')
+        # Histogram
+        histogram = alt.Chart(KMEnv).mark_bar().encode(
+            x=alt.X('K5:O', title='Cluster'),
+            y=alt.Y('count()', title='Count')
+        ).properties(
+            width=300,
+            height=400,
+            title='Histogram of cluster counts'
+        )
 
-        plt.tight_layout()
-
-        st.pyplot(fig)
-        plt.close(fig)
+        combined_plot = alt.hconcat(scatterplot, histogram)
+        st.altair_chart(combined_plot, use_container_width=True)
 
         st.write('We can make the following assumptions:')
         st.write('- Clusters 1-2 are of normal weather conditions','\n',
@@ -396,8 +436,7 @@ with tab3:
         
         st.subheader('Breakdown of each clusters')
         cluster_centers = k5.cluster_centers_
-
-        fig, axs = plt.subplots(nrows=1, ncols=5, figsize=(16, 8))
+        scatter_data = []
 
         for i, center in enumerate(cluster_centers):
             cluster_data = KMEnv[KMEnv['K5'] == i]
@@ -407,14 +446,32 @@ with tab3:
             model.fit(X, y)
             prediction = model.predict(X)
             
-            axs[i].scatter(y, prediction)
-            axs[i].set_xlabel('Actual Area')
-            axs[i].set_ylabel('Predicted Area')
-            axs[i].set_title(f'Cluster {i+1}')
-            
-        plt.tight_layout()
-        st.pyplot(fig)
-        plt.close(fig)
+            cluster_scatter = pd.DataFrame({'Cluster': [f'Cluster {i+1}'] * len(y),
+                                            'Actual Area': y,
+                                            'Predicted Area': prediction})
+            scatter_data.append(cluster_scatter)
+
+        scatterplot = (
+            alt.Chart(pd.concat(scatter_data))
+            .mark_circle(size=50)
+            .encode(
+                x='Actual Area',
+                y='Predicted Area',
+                tooltip=['Cluster', 'Actual Area', 'Predicted Area'],
+                color=alt.Color('Cluster:N', scale=alt.Scale(scheme='category10'))
+            )
+            .properties(
+                width=200,
+                height=200,
+                title='Actual Area vs Predicted Area by Cluster'
+            )
+            .facet(
+                facet='Cluster:N',
+                columns=5
+            ).interactive()
+        )
+
+        st.altair_chart(scatterplot, use_container_width=True)
 
         center_data = {'Cluster': [], 'temp': [], 'RH': [], 'wind': [], 'rain': [], 'logarea': []}
         for i, center in enumerate(cluster_centers):
@@ -439,25 +496,30 @@ with tab3:
 
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=1)
         
-        reg = LinearRegression().fit(X_train, y_train)
+        DM2reg = LinearRegression().fit(X_train, y_train)
 
-        y_pred_reg = reg.predict(X_test)
+        y_pred_reg = DM2reg.predict(X_test)
         
         st.write('A linear regression model was used with 70% training and 30% testing. ',
                  'Variables FFMC, DMC, DC, and ISI were set as our X variables while logarea was set as our target Y variable.')
         with st.expander('Model results:'):
             st.write('Mean absolute error:', mean_absolute_error(y_test, y_pred_reg))
-            st.write('Coefficients (temperature, RH (relative humidity), wind, rain):', reg.coef_)
-            st.write('Intercept:', reg.intercept_)
-            st.write('Determination coefficient: ', reg.score(X_test, y_test))
+            st.write('Coefficients (temperature, RH (relative humidity), wind, rain):', DM2reg.coef_)
+            st.write('Intercept:', DM2reg.intercept_)
+            st.write('Determination coefficient: ', DM2reg.score(X_test, y_test))
 
         st.subheader('Model predictions vs actual results')
-        plt.scatter(y_test, y_pred)
-        plt.xlabel('LogArea')
-        plt.ylabel('Predicted LogArea')
-        plt.title('Actual vs Predicted Burned LogArea by FWI')
-        st.pyplot(plt)
-        plt.close()
+        scatter_data = pd.DataFrame({'Actual LogArea': y_test,
+                                    'Predicted LogArea': y_pred})
+
+        scatterplot = alt.Chart(scatter_data).mark_circle().encode(
+            x='Actual LogArea',
+            y='Predicted LogArea',
+            tooltip=['Actual LogArea', 'Predicted LogArea']
+        ).properties(
+            title='Actual vs Predicted Burned LogArea by FWI'
+        ).interactive()
+        st.altair_chart(scatterplot, use_container_width=True)
         
         st.header('Using K-Means')
         KMFWI = fires[['FFMC', 'DMC', 'DC', 'ISI', 'logarea']]
@@ -476,41 +538,56 @@ with tab3:
             km.fit(KMFWIScaled)
             distortions.append(km.inertia_)
             
-        plt.plot(range(2, 15), distortions, marker='o')
-        plt.xlabel('Number of clusters')
-        plt.ylabel('Distortion')
-        plt.title('Cluster count based off distortions')
-        st.pyplot(plt)
-        plt.close()
-        
+        line_data = pd.DataFrame({'Number of clusters': range(2, 15), 'Distortion': distortions})
+        lineplot = alt.Chart(line_data).mark_line().encode(
+            x='Number of clusters',
+            y='Distortion'
+        ).properties(
+            width=600,
+            height=400,
+            title='Cluster count based off distortions'
+        )
+        # Add markers to the line plot
+        markerplot = alt.Chart(line_data).mark_point().encode(
+            x='Number of clusters',
+            y='Distortion'
+        )
+        combined_plot = lineplot + markerplot
+        st.altair_chart(combined_plot, use_container_width=True)
         st.write('We will be using K=6.')
+        
         k6 = KMeans(n_clusters = 6, random_state=1).fit(KMFWIScaled)
         KMFWI['K6'] = k6.labels_
         
         st.subheader('Cluster distribution analysis')
-        fig, ax = plt.subplots(1, 2, figsize=(15, 8))
-        fig.suptitle('Analysis of cluster distribution')
+        scatter_data = pd.DataFrame({'FWI_score': fwi['FWI_score'],
+                                    'LogArea': fwi['logarea'],
+                                    'Cluster': KMFWI['K6']})
+        histogram_data = pd.DataFrame({'Cluster': KMFWI['K6']})
 
-        sns.scatterplot(x=fwi['FWI_score'], y=fwi['logarea'], hue=KMFWI['K6'], ax=ax[0])
-        sns.histplot(KMFWI['K6'], bins=6, ax=ax[1])
+        scatterplot = alt.Chart(scatter_data).mark_circle().encode(
+            x='FWI_score',
+            y='LogArea',
+            color=alt.Color('Cluster:N', legend=alt.Legend(title='Cluster')),
+            tooltip=['FWI_score', 'LogArea', 'Cluster']
+        ).properties(
+            title='KMeans of FWI with FWI scores and LogArea burned'
+        ).interactive()
 
-        ax[0].set_xlabel('FWI score')
-        ax[0].set_ylabel('logarea')
-        ax[0].set_title('KMeans of FWI with FWI scores and LogArea burned')
-        ax[0].legend()
+        # Histogram
+        histogram = alt.Chart(histogram_data).mark_bar().encode(
+            x=alt.X('Cluster:O', title='Cluster'),
+            y=alt.Y('count()', title='Count')
+        ).properties(
+            title='Histogram of cluster counts'
+        )
 
-        ax[1].set_xlabel('Cluster')
-        ax[1].set_ylabel('Count')
-        ax[1].set_title('Histogram of cluster counts')
+        chart = alt.hconcat(scatterplot, histogram)
+        st.altair_chart(chart, use_container_width=True)
 
-        plt.tight_layout()
-        st.pyplot(fig)
-        plt.close(fig)
-        
         st.subheader('Breakdown of cluster distribution')
         cluster_centers = k6.cluster_centers_
-
-        fig, axs = plt.subplots(nrows=1, ncols=6, figsize=(16, 8))
+        breakdown_data = pd.DataFrame()
 
         for i, center in enumerate(cluster_centers):
             cluster_data = KMFWI[KMFWI['K6'] == i]
@@ -523,15 +600,28 @@ with tab3:
             
             prediction = model.predict(X)
             
-            axs[i].scatter(y, prediction)
-            axs[i].set_xlabel('Actual Area')
-            axs[i].set_ylabel('Predicted Area')
-            axs[i].set_title(f'Cluster {i+1}')
-            
-        plt.tight_layout()
-        st.pyplot(fig)
-        plt.close(fig)
-        
+            cluster_breakdown = pd.DataFrame({'Actual Area': y, 'Predicted Area': prediction, 'Cluster': f'Cluster {i+1}'})
+            breakdown_data = pd.concat([breakdown_data, cluster_breakdown], ignore_index=True)
+
+        # Scatter plot
+        scatterplot = alt.Chart(breakdown_data).mark_circle().encode(
+            x='Actual Area',
+            y='Predicted Area',
+            color=alt.Color('Cluster:N', legend=alt.Legend(title='Cluster')),
+            tooltip=['Actual Area', 'Predicted Area', 'Cluster']
+        ).properties(
+            width=200,
+            height=200,
+            title='Breakdown of cluster distribution'
+        ).interactive()
+
+        chart = scatterplot.facet(
+            column='Cluster',
+            columns=6
+        ).resolve_scale(y='shared')
+
+        st.altair_chart(chart, use_container_width=True)
+
         center_columns = ['FFMC', 'DMC', 'DC', 'ISI', 'logarea']
         center_data = []
 
@@ -553,27 +643,30 @@ with tab3:
 
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=1)
         
-        reg = LinearRegression().fit(X_train, y_train)
+        DM3reg = LinearRegression().fit(X_train, y_train)
         
         st.write('A linear regression test was done with temp, RH, wind, and rain as the X variables and FWI score as our target Y variable.',
                  'The dataset was split wtih 80% training and 20% testing.')
 
         with st.expander('Model results'):
-            st.write('Coefficients (temperature, RH (relative humidity), wind, rain):', reg.coef_)
-            st.write('Intercept:', reg.intercept_)
-            st.write('Determination coefficient: ', reg.score(X_test, y_test))
-            y_pred = reg.predict(X_test)
+            st.write('Coefficients (temperature, RH (relative humidity), wind, rain):', DM3reg.coef_)
+            st.write('Intercept:', DM3reg.intercept_)
+            st.write('Determination coefficient: ', DM3reg.score(X_test, y_test))
+            y_pred = DM3reg.predict(X_test)
             model_mae = mean_absolute_error(y_test, y_pred)
             st.write('Mean absolute error:', model_mae)
             
         st.subheader('Model predictions vs actual results')
-        plt.scatter(y_test, y_pred)
-        plt.xlabel('Actual FWI score')
-        plt.ylabel('Predicted FWI score')
-        plt.title('Actual vs Predicted FWI score based on weather conditions with Linear Regression')
-
-        st.pyplot(plt)
-        plt.close()
+        scatter_data = pd.DataFrame({'Actual FWI score': y_test, 'Predicted FWI score': y_pred})
+        scatterplot = alt.Chart(scatter_data).mark_circle().encode(
+            x='Actual FWI score',
+            y='Predicted FWI score',
+            tooltip=['Actual FWI score', 'Predicted FWI score']
+        ).properties(
+            height=500,
+            title='Actual vs Predicted FWI score based on weather conditions with Linear Regression'
+        ).interactive()
+        st.altair_chart(scatterplot, use_container_width=True)
 
         
         st.header('Using random Forest model')
@@ -584,13 +677,16 @@ with tab3:
 
         st.write('Mean Absolute Error:', mean_absolute_error(y_test, y_pred))
 
-        plt.scatter(y_test, y_pred)
-        plt.xlabel('Actual FWI score')
-        plt.ylabel('Predicted FWI score')
-        plt.title('Actual vs Predicted FWI score based on weather conditions with Random Forest')
-
-        st.pyplot(plt)
-        plt.close()
+        scatter_data = pd.DataFrame({'Actual FWI score': y_test, 'Predicted FWI score': y_pred})
+        scatterplot = alt.Chart(scatter_data).mark_circle().encode(
+            x='Actual FWI score',
+            y='Predicted FWI score',
+            tooltip=['Actual FWI score', 'Predicted FWI score']
+        ).properties(
+            height=500,
+            title='Actual vs Predicted FWI score based on weather conditions with Random Forest'
+        ).interactive()
+        st.altair_chart(scatterplot, use_container_width=True)
 
     with DM4:
         st.header('Fire predictions by the month')
@@ -610,7 +706,6 @@ with tab3:
         logreg.fit(X_train, y_train)
 
         y_prob = logreg.predict_proba(X_test)
-
         max_prob_indices = y_prob.argmax(axis=1)
         predicted_months = logreg.classes_[max_prob_indices]
         predicted_months_counts = pd.Series(predicted_months).value_counts()
@@ -646,3 +741,32 @@ with tab3:
         st.write('In both of the models, each of them predicted a month that was not present in the other prediction. The linear regression predicted the month of October, which does not appear in the gradient boosting classification. ',
                  'While the gradient boosting classification predicted the month of June. ',
                  'Neither of these predictions are entirely false as both of these months have had an instance of a forest fire occurring.')
+
+
+with tab4:
+    st.title('🔥 Predict a forest fire! 🔥')
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        user_inputs = userWeather()
+        
+        if st.button("Predict by weather"):
+            predictions = DM1reg.predict(user_inputs)
+
+            if predictions[0] > 0:
+                st.write("There is a high likelihood of fire occurrence.")
+                st.write('Potential area burned: ', predictions)
+            else:
+                st.write("There is a low likelihood of fire occurrence.")
+
+    with col2:
+        user_inputs = userFWI()
+            
+        if st.button("Predict by FWI indices"):    
+            predictions = DM2reg.predict(user_inputs)
+
+            if predictions[0] > 0:
+                st.write("There is a high likelihood of fire occurrence.")
+                st.write('Potential area burned: ', np.exp(predictions))
+            else:
+                st.write("There is a low likelihood of fire occurrence.")
