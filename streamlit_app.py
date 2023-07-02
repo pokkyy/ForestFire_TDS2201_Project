@@ -72,7 +72,7 @@ with st.expander("**Expected Output:**"):
     "- Show prediction on weather conditions that would result in a high FWI","\n",
     "- Provide information on the amount of forest that is burned due to the intensity of the fire.")
 
-tab1, tab2, tab3, tab4= st.tabs(["Database", "Exploratory Data Analysis", "Data Modelling", "Make Predictions"])
+tab1, tab2, tab3, tab4, tab5= st.tabs(["Database", "Exploratory Data Analysis", "Data Modelling", "Conclusions", "Make Predictions"])
 
 with tab1:
     # Intro -------------------------------------------------------------------------
@@ -742,8 +742,28 @@ with tab3:
                  'While the gradient boosting classification predicted the month of June. ',
                  'Neither of these predictions are entirely false as both of these months have had an instance of a forest fire occurring.')
 
-
 with tab4:
+    st.write('Through analysing the forest fires dataset, we find that the months of August and September are candidates with high forest fire occurrences. ',
+             'The months of October, April, and May on the other hand, have the lowest fire occurrence count. Higher scores of FWI were shown in the months of August, September, June, and July.')
+    st.write('Correlation between each variable and burned area indicates that most of the factors, apart from relative humidity and rain, play a role in influencing the chances of a forest fire occurring. ',
+             'In trying to predict the intensity of a forest fire, all the variables must be taken into account as relying on FWI scores alone shows us that not all high FWI scores translates into fires of high intensity.')
+    st.write('Various models including linear regression, random forest, and K-Means clustering were used as an approach to finding the relationship between the variables and area burned, ',
+             'along with predicting the likelihood of fires happening and the extent of the damage that would occur. ',
+             'Our findings suggest that weather conditions are not a reliable predictor in trying to predict a forest fire. ',
+             'Through K-Means, we discover that most fires tend to take place in moderate weather conditions, ',
+             'as intense weather conditions of rain and RH dampen the chances of a forest fire becoming more intense.')
+    st.write('A similar procedure was done with FWI indices in place. From this, we uncovered a more linear relationship between the FWI indices and the log area burned. ',
+             'The results of the clustering from K-Means is also similar to the rankings of fire intensity, indicating that they have an impact on the level of intensity a fire is.')
+    st.write('As FWI indices are based on weather conditions, we can draw a conclusion that periods of more rain and RH may indicate lesser FWI scoring. ',
+             'Thus, reducing the intensity of possible forest fires that might occur. ',
+             'It is advised that additional support and observation for forest fire prevention is required during periods of hotter temperatures and the months following them.')
+    st.write('Although seasons were not a factor with great emphasis in this project, a conclusion can still be drawn based on the months most often associated with those seasons. ',
+             'From this study, we find that the seasons of summer and autumn have a higher potential than other seasons to attract forest fires.')
+    st.write('To conclude, our research finds that both weather conditions and FWI indices play a significant role in the count of fire occurrences and the intensity of a forest fire. ',
+             'However, neither can be used as a standalone measure, as both are required in order to make a more accurate judgement and prediction.')
+
+
+with tab5:
     st.title('🔥 Predict a forest fire! 🔥')
     
     col1, col2 = st.columns(2)
